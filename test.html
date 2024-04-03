@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en-US">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Test</title>
+  </head>
+  <body>
+  
+	<input type="text" id="input">  </input>
+	<button type="button" onclick="clickButton()">Click</button>
+	<br>
+    <canvas id="canvas" width="1000px" height="500px"></canvas>
+	
+    <script type="application/javascript">
+		
+		class RectZone {
+			constructor(context) {
+				this.context = context;
+				
+				this.x = 0;
+				this.y = 0;
+				this.height = 0;
+				this.width = 0;
+				this.color = "rgba(255, 0, 0, 0.3)";
+				this.isVision = false;
+			}
+			
+			updateSize = function (x, y) {
+				this.width = x - this.x;
+				this.height = y - this.y;
+			}
+			
+			getSymbols = function (arraySymbol) {
+				const array = [];
+				
+				for (let i = 0; i < arraySymbol.length; i++) {
+					const symbol = arraySymbol[i];
+					
+					var x = this.x;
+					var y = this.y;
+					var width = this.width;
+					var height = this.height;
+					
+					if ( width < 0 ){
+						width = width * -1;
+						x -= width;
+					}
+					
+					if ( height < 0 ){
+						height = height * -1;
+						y -= height;
+					}
+					
+					var sY = symbol.y;
+					var sH = symbol.height;
+					
+					sH /= 2;
+					
+					if ( x <= symbol.x && symbol.x + symbol.width() <= x + width ){
+						if ( y <= sY && sY + sH <= y + height ){
+							array.push(symbol);
+						}
+					}
+				}
+				
+				return array;
+			}
+			
+			draw = function () {
+				if (!this.vision)	return;
+			
+				context.beginPath();
+				context.fillStyle = this.color;
+				context.rect(this.x, this.y, this.width, this.height);
+				context.fill();
+			}
+			
+		}
+	
+		class Symbol {
+			constructor(context, symbol) {
+				this.context = context;
+				this.symbol = symbol;
+				
+				this.x = 200;
+				this.y = 200;
+				this.height = 40;
+				this.color = 'black';
+				this.colorSelect = 'blue';
+				this.isSelected = false;
+			}
+			
+			draw = function () {
+				context.font = this.height + 'px Kremlin Pro Web';
+				
+				if (this.isSelected)
+					context.fillStyle = this.colorSelect;
+				else
+					context.fillStyle = this.color;
+					
+				context.fillText(this.symbol, this.x, this.y + this.height / 2);
+			}
+			
+			width = function () {
+				return context.measureText(this.symbol).width;
+			}
+			
+			height = function () {
+				return this.height;
+			}
+			
+			move = function (x, y) {
+				this.x += x;
+				this.y += y;
+			}
+			
+			moveToPoint = function (x, y) {
+				this.x = x - this.width() / 2;
+				this.y = y - this.height / 2;
+			}
+			
+			isClick = function (x, y) {
+				if ( this.x <= x && x <= this.x + this.width() ){
+					if ( this.y <= y && y <= this.y + this.height ){
+						return true;
+					}
+				}
+			
+				return false;
+			}
+		}
+	
+		const canvas = document.getElementById("canvas");
+		const context = canvas.getContext("2d");
+		const background = '#ff1fff';
+		const rectZone = new RectZone(context);
+		var arraySymbol = [];
+		var isClock = false;
+		var symbol = null;
+		var arraySelected = [];
+		var isCtrl = false;
+		var keySymbols = [];
+		var startX = 0;
+		var startY = 0;
+
+		canvas.addEventListener("mousedown", (e) => {
+			isClock = true;
+			
+			var pos = getMousePos(canvas, e),
+			x = pos.x,
+			y = pos.y;
+			
+			symbol = getSymbolOnClick(x, y);
+			
+			if (symbol == null){
+				clearSelected(arraySymbol);
+				
+				rectZone.x = x;
+				rectZone.y = y;
+				rectZone.width = 0;
+				rectZone.hieght = 0;
+				
+				rectZone.vision = true;
+			}else{
+				if (isCtrl){
+					symbol.isSelected = true;
+					arraySelected.push(symbol);
+				}else if (!symbol.isSelected){
+					clearSelected(arraySymbol);
+					
+					startX = symbol.x;
+					startY = symbol.y;
+				}
+			}
+		});
+
+		canvas.addEventListener("mousemove", (e) => {
+			var deltaX = e.movementX;
+			var deltaY = e.movementY;
+			
+			var pos = getMousePos(canvas, e),
+			x = pos.x,
+			y = pos.y;
+			
+			if (keySymbols.length > 0){
+				for (let i = 0; i < keySymbols.length; i++) {
+					// Я тут не совсем понял что нужно сделать, нужно что бы 
+					// буквы стали на координаты курсора, или же что бы они перемещялись туда, куда двигается курсор?
+					// во всяком я сделал 2 варианта :)
+					
+					//keySymbols[i].moveToPoint(x, y)
+					keySymbols[i].move(deltaX, deltaY);
+				}
+			}
+		
+			if (isClock){
+				if (symbol != null){
+					if (symbol.isSelected){
+						for (let i = 0; i < arraySelected.length; i++) {
+							const s = arraySelected[i];
+							s.move(deltaX, deltaY);
+						}
+					}
+					else
+						symbol.move(deltaX, deltaY);
+				}
+				
+				if (rectZone.vision){
+					clearSelected(arraySymbol);
+					rectZone.updateSize(x, y);
+					
+					const array = rectZone.getSymbols(arraySymbol);
+					arraySelected = [];
+					
+					for (let i = 0; i < array.length; i++) {
+						const symbol = array[i];
+						
+						symbol.isSelected = true;
+						
+						arraySelected.push(symbol);
+					}
+				}
+			}
+		});
+
+		window.addEventListener("mouseup", (e) => {
+			if (isClock) {
+				if (symbol != null && arraySelected.length == 0){
+					var pos = getMousePos(canvas, e),
+					x = pos.x,
+					y = pos.y;
+					
+					s = getSymbolOnClick(x, y, symbol);
+					
+					if (s != null){
+						var tempX = s.x;
+						var tempY = s.y;
+						
+						s.x = startX;
+						s.y = startY;
+						symbol.x = tempX;
+						symbol.y = tempY;
+					}
+				}
+			
+				isClock = false;
+				
+				rectZone.vision = false;
+			}
+		});
+		
+		window.addEventListener('keydown', function (event) {
+			keySymbols = [];
+			const key = event.key;
+			
+			console.log(key);
+			
+			for (let i = 0; i < arraySymbol.length; i++) {
+				const s = arraySymbol[i];
+				
+				if (s.symbol == key){
+					keySymbols.push(s);
+				}
+			}
+		
+			if(event.keyCode == 17){
+				isCtrl = true;
+			}
+			
+		});
+		
+		window.addEventListener('keyup', function (event) {
+			keySymbols = [];
+		
+			if(event.keyCode == 17){
+				isCtrl = false;
+			}
+		});
+		
+		setInterval(function() {
+			clearWindow();
+			
+			draw();
+		}, 5);
+
+
+		function draw() {
+			for (let i = 0; i < arraySymbol.length; i++) {
+				arraySymbol[i].draw();
+			}
+			
+			rectZone.draw();
+		}
+
+		function getSymbolOnClick(x, y) {
+			return getSymbolOnClick(x, y, null);
+		}
+		
+		function getSymbolOnClick(x, y, ignorySymbol) {
+			for (let i = 0; i < arraySymbol.length; i++) {
+				let s = arraySymbol[i];
+				
+				if (s == ignorySymbol) continue;
+				
+				if (s.isClick(x, y)){
+					return s;
+				}
+			}
+			
+			return null;
+		}
+		
+		function getMousePos(canvas, e) {
+			var rect = canvas.getBoundingClientRect();
+			return {x: e.clientX - rect.left, y: e.clientY - rect.top};
+		}
+		
+		function clearSelected(array) {
+			arraySelected = [];
+			
+			for (let i = 0; i < array.length; i++) {
+				const symbol = array[i];
+				
+				symbol.isSelected = false;
+			}
+		}
+		
+		function clearWindow() {
+			context.beginPath();
+			context.fillStyle = background;
+			context.rect(0, 0, canvas.width, canvas.height);
+			context.fill();
+		}
+		
+		function clickButton() {
+			const text = document.getElementById("input").value;
+			
+			arraySymbol = [];
+			
+			clearWindow();
+			
+			for (let i = 0; i < text.length; i++) {
+				const s = text[i];
+				const symbol = new Symbol(context, s);
+				
+				if (i > 0){
+					const lastSymbol = arraySymbol[i-1];
+					
+					symbol.x = lastSymbol.x + lastSymbol.width();
+					
+				}
+				
+				arraySymbol.push(symbol);
+				
+				symbol.draw();
+			}
+		}
+
+    </script>
+  </body>
+</html>
